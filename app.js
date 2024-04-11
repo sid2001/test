@@ -61,7 +61,11 @@ app.post('/command', (req,res)=>{
     }
     res.status(200).send('Command received');
 });
-
+wss.on('connection', (ws) => {
+    clients.push(ws);
+    ws.on('message', messageHandler);
+    ws.send('Hello! Message From Server!!');
+});
 const server = app.listen({port:port,host:host}, () => {
     console.log(`Server started at http://localhost:${port}`);
 });
