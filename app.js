@@ -51,21 +51,24 @@ function startNextProcess() {
         });
     }
 }
-
-app.post('/command', (req,res)=>{
-    const command = req.body.command;
-    commandQueue.push(command);
-    
-    if(!currentChildProcess){
-        startNextProcess();
-    }
-    res.status(200).send('Command received');
+wss.on('connection', (ws) => {
+    clients.push(ws);
+    ws.on('message', messageHandler);
+    ws.send('Hello! Message From Server!!');
 });
 wss.on('connection', (ws) => {
     clients.push(ws);
     ws.on('message', messageHandler);
     ws.send('Hello! Message From Server!!');
 });
+<<<<<<< HEAD
+=======
+wss.on('connection', (ws) => {
+    clients.push(ws);
+    ws.on('message', messageHandler);
+    ws.send('Hello! Message From Server!!');
+});
+>>>>>>> main
 const server = app.listen({port:port,host:host}, () => {
     console.log(`Server started at http://localhost:${port}`);
 });
