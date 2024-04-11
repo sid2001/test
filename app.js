@@ -3,43 +3,41 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const {WebSocketServer} = require('ws');
 const tty = require('tty');
-const pty = require('node-pty');
+const fs = require('fs');
 const app = express();
 const process = require('process');
 const port = 3000;
+// const host = '172.25.195.185';
 const host = '127.0.0.1';
 
 app.use(bodyParser.json());
 
-let commandQueue = [];
+let commandQueue = new Map();
 let currentChildProcess = null;
-let clients = [];
-let currentPty = null;
+let clients = new Map();
 
-function startNextProcess() {
-    if (commandQueue.length > 0 && !currentChildProcess) {
-
-        const command = commandQueue.shift();
+function startNextProcess(user) {
+    if (commandQueue.get(user)?.length > 0 && !currentChildProcess) {
+        // console.log('process');
+        const command = commandQueue.get(user).shift();
+        // console.log(command);
         const baseCommand = "cd '/mnt/c/Users/Shubhranshu Sanjeev/My Documents/NodePlayground'";
         const fullCommand = `${baseCommand} && ${command}`;
 
-        currentChildProcess = spawn(fullCommand, {shell: true,stdio:"overlapped"});
+        currentChildProcess = spawn(fullCommand, {shell: true});
         
         let stdoutData = '';
         let stderrData = '';
 
         currentChildProcess.stdout.on('data', (data) => {
             stdoutData += data.toString();
-            clients.forEach((client) => {
-                client.send(stdoutData);
-            });
+            // console.log('stdout: ',data)
+            clients.get(user).send(stdoutData);
         });
 
         currentChildProcess.stderr.on('data', (data) => {
             stderrData += data.toString();
-            clients.forEach((client) => {
-                client.send(stderrData);
-            });
+            clients.get(user).send(stderrData);
         });
         
         currentChildProcess.on('close', (code) => {
@@ -54,17 +52,56 @@ function startNextProcess() {
 
 
 const server = app.listen({port:port,host:host}, () => {
-    console.log(`Server started at http://localhost:${port}`);
+    console.log(`Server started at http://${host}:${port}`);
 });
-const wss = new WebSocketServer({server:server,clientTracking: true});
+const wss = new WebSocketServer(
+    {
+        server:server,
+        clientTracking: true,
+        maxReceivedFrameSize: 2048000,  
+        maxReceivedMessageSize: 2048000
+    }
+);
+app.get('/video', (req, res) => {
+    const videoPath = './video.mp4';
+    const stat = fs.statSync(videoPath);
+    const fileSize = stat.size;
+    console.log('video required');
+    const range = req.headers.range;
+    if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
 
+        const chunksize = (end - start) + 1;
+        const file = fs.createReadStream(videoPath, { start, end });
+        const head = {
+            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+            'Accept-Ranges': 'bytes',
+            'Content-Length': chunksize,
+            'Content-Type': 'video/mp4',
+        };
+
+        res.writeHead(206, head);
+        file.pipe(res);
+    } else {
+        const head = {
+            'Content-Length': fileSize,
+            'Content-Type': 'video/mp4',
+        };
+        res.writeHead(200, head);
+        fs.createReadStream(videoPath).pipe(res);
+    }
+})
 function messageHandler(message) {
-    //console.log(`Received message => ${message}`);
+    // console.log(`Received message => ${message}`);
     const json = JSON.parse(message.toString()); 
     const command = json.command;
     if(json.type==='start'){
-        commandQueue.push(command);
-        startNextProcess();
+        clients.set(json.user, this);
+        // console.log(clients.get(json.user));
+        commandQueue.set(json.user,[command]);
+        startNextProcess(json.user);
     }else{
         // currentPty.write(command+'\n');
        // console.log(command);
@@ -78,7 +115,6 @@ function messageHandler(message) {
 }
 
 wss.on('connection', (ws) => {
-    clients.push(ws);
     ws.on('message', messageHandler);
     ws.send('Hello! Message From Server!!');
 });
