@@ -18,13 +18,6 @@ let currentPty = null;
 
 function startNextProcess() {
     if (commandQueue.length > 0 && !currentChildProcess) {
-        //currentPty = tty.open();
-        //currentPty.on('data', (data) => {
-          //  clients.forEach((client) => {
-            //    client.send(data);
-           // });
-        //});
-        //
 
         const command = commandQueue.shift();
         const baseCommand = "cd '/mnt/c/Users/Shubhranshu Sanjeev/My Documents/NodePlayground'";
