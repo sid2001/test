@@ -2,29 +2,31 @@ const {exec} = require('child_process');
 const express = require('express'); 
 const bodyParser = require('body-parser');
 const { Worker } = require('worker_threads');
-
+const {stdin:input, stdout:output} = require('process');
+const readline = require('readline');
 const app = express();  
 const port = 3000;
 const host = '127.0.0.1'; //localhost
 app.get('/', (req, res) => {
-//write code to execute the terminal command
-    //command will be given in the request body
-    //i want to use workder threads for multi threading
     
     
     let command = req.query.command;
     console.log(req.query);
     //rewrite the code below with worker threads
         //access workerData from here
-
-        exec(command, (error, stdout, stderr) => {
+    const baseCommand = "cd '/mnt/c/Users/Shubhranshu Sanjeev/My Documents/NodePlayground'";
+        exec(baseCommand+" && "+ command , (error, stdout, stderr) => {
+            const rl = readline.createInterface({ input, output });
             if (error) {
                 console.error(`exec error: ${error}`);
+                //send all possible errors in form of json including stderr and system errors
+                //
+                res.json({input:input,output:output,error: error, stderr: stderr,stdout: stdout});
                 return;
             }
             console.log(`stdout: ${stdout}`);
             console.error(`stderr: ${stderr}`);
-            res.send(stdout);
+            res.json({stdout: stdout, stderr: stderr,input:input,output:output});
         });
 });
 
